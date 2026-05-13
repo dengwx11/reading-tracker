@@ -175,7 +175,7 @@ body{font-family:var(--font-sans);background:var(--bg);color:var(--text);line-he
     <a data-tab="rec" onclick="SW(&#39;rec&#39;,this)" class=""><span class="s-ico">◎</span> 推荐</a>
     <a data-tab="stats" onclick="SW(&#39;stats&#39;,this)"><span class="s-ico">▤</span> 进度</a>
   </nav>
-  <div class="sidebar-footer">3 个时间槽位<br>待产窗口期 ⭐</div>
+  <div class="sidebar-footer">3 个时间槽位 · 待产窗口期 ⭐<br><span id="syncStatus">⚪ 未配置</span></div>
 </aside>
 
 <nav class="mob-nav"><a class="active" data-tab="dash" onclick="SW(&#39;dash&#39;,this)"><span class="m-ico">◈</span>仪表盘</a><a data-tab="lib" onclick="SW(&#39;lib&#39;,this)"><span class="m-ico">▣</span>书库</a><a data-tab="rec" onclick="SW(&#39;rec&#39;,this)"><span class="m-ico">◎</span>推荐</a><a data-tab="stats" onclick="SW(&#39;stats&#39;,this)"><span class="m-ico">▤</span>进度</a></nav>
@@ -254,7 +254,7 @@ body{font-family:var(--font-sans);background:var(--bg);color:var(--text);line-he
 <!-- ══ STATS ══ -->
 <div class="tab" id="tab-stats">
 <div class="page-title">进度</div>
-<div class="card"><div class="card-header">⚙ 设置</div><div style="display:flex;gap:20px;flex-wrap:wrap"><div style="flex:1;min-width:180px"><label>预产期（窗口期基准）</label><input type="date" id="dueInput" onchange="US()"></div><div style="flex:1;min-width:180px"><label>当前阶段</label><select id="ppToggle" onchange="US()"><option value="false">产前 · 7h/天</option><option value="true">产后 · 3h/天</option></select></div></div></div>
+<div class="card"><div class="card-header">⚙ 设置</div><div style="display:flex;gap:20px;flex-wrap:wrap"><div style="flex:1;min-width:180px"><label>预产期（窗口期基准）</label><input type="date" id="dueInput" onchange="US()"></div><div style="flex:1;min-width:180px"><label>当前阶段</label><select id="ppToggle" onchange="US()"><option value="false">产前 · 7h/天</option><option value="true">产后 · 3h/天</option></select></div></div><div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border-light)"><label>☁️ GitHub Token（用于Gist云同步）</label><div style="display:flex;gap:8px"><input type="password" id="gistTokenInput" placeholder="ghp_..." style="flex:1" onchange="gistToken=this.value;localStorage.setItem('rt_gist_token',gistToken);syncStatus='🟡';syncToGist();syncFromGist();updateSyncUI()"><button class="btn btn-outline btn-sm" onclick="const v=document.getElementById('gistTokenInput').value;gistToken=v;localStorage.setItem('rt_gist_token',v);syncFromGist();toast('已连接云同步')">连接</button></div><div style="font-size:.7rem;color:var(--text3);margin-top:4px">每个设备首次使用需输入token · <a href="https://github.com/settings/tokens" target="_blank" style="color:var(--accent)">获取token</a>（仅需gist权限）</div></div></div>
 
 <div class="card"><div class="stat-row" id="statGrid"></div></div>
 
@@ -423,6 +423,8 @@ const B=[
   {id:"p10",t:"真实世界的脉络",au:"Deutsch",nw:"搁置",sl:"C",pr:3,hr:10,i:"Deep",wn:false,q:""},
 ];
 const CORE_HR=B.filter(b=>b.pr===1).reduce((s,b)=>s+b.hr,0);
+const GIST_ID='f8a9d535beb0c87ef0e1d911a8e84f8f';
+let gistToken=localStorage.getItem('rt_gist_token')||'';
 
 // ═══════════ CROSS PAIRS ═══════════
 const XPAIRS=[
@@ -449,7 +451,10 @@ let S={books:[],settings:{...DEF},harvests:[]};
 function LD(){
   try{const raw=localStorage.getItem('rt4');if(raw){const d=JSON.parse(raw);S.settings={...DEF,...d.settings};S.harvests=d.harvests||[];S.books=B.map(b=>{const sv=(d.books||[]).find(s=>s.id===b.id);if(sv){const notes=Array.isArray(sv.notes)?sv.notes:(sv.nts?[{ts:new Date().toISOString(),html:sv.nts.replace(/\n/g,'<br>')}]:[]);return{...b,st:sv.st,hrs:sv.hrs||0,ss:sv.ss||[],sa:sv.sa||null,fa:sv.fa||null,notes};}return{...b,st:'to-read',hrs:0,ss:[],sa:null,fa:null,notes:[]};});}else{S.books=B.map(b=>({...b,st:'to-read',hrs:0,ss:[],sa:null,fa:null,notes:[]}));}}catch(e){console.error(e);S.books=B.map(b=>({...b,st:'to-read',hrs:0,ss:[],sa:null,fa:null,notes:[]}));}
 }
-function SV(){const d={settings:S.settings,harvests:S.harvests,books:S.books.map(b=>({id:b.id,st:b.st,hrs:b.hrs,ss:b.ss,sa:b.sa,fa:b.fa,notes:b.notes||[]}))};try{localStorage.setItem('rt4',JSON.stringify(d));}catch(e){toast('存储不足');}}
+function SV(){const d={settings:S.settings,harvests:S.harvests,books:S.books.map(b=>({id:b.id,st:b.st,hrs:b.hrs,ss:b.ss,sa:b.sa,fa:b.fa,notes:b.notes||[]}))};try{localStorage.setItem('rt4',JSON.stringify(d));}catch(e){toast('存储不足');}syncToGist();}
+function syncToGist(){if(!gistToken)return;const d={_ts:new Date().toISOString(),settings:S.settings,harvests:S.harvests,books:S.books.map(b=>({id:b.id,st:b.st,hrs:b.hrs,ss:b.ss,sa:b.sa,fa:b.fa,notes:b.notes||[]}))};fetch(`https://api.github.com/gists/${GIST_ID}`,{method:'PATCH',headers:{'Authorization':'token '+gistToken,'Content-Type':'application/json'},body:JSON.stringify({files:{[GIST_FILE]:{content:JSON.stringify(d)}}})}).then(r=>{if(r.ok){syncStatus='🟢';updateSyncUI();}}).catch(()=>{syncStatus='🔴';updateSyncUI();});}
+function syncFromGist(){if(!gistToken)return;fetch(`https://api.github.com/gists/${GIST_ID}`).then(r=>r.json()).then(g=>{if(!g.files||!g.files[GIST_FILE])return;try{const d=JSON.parse(g.files[GIST_FILE].content);if(!d._ts||!d.books)return;const local=localStorage.getItem('rt4');const localObj=local?JSON.parse(local):null;if(localObj&&localObj._ts&&localObj._ts>=d._ts)return;S.settings={...S.settings,...d.settings};S.harvests=d.harvests||[];S.books=B.map(b=>{const sv=(d.books||[]).find(s=>s.id===b.id);if(sv)return{...b,st:sv.st,hrs:sv.hrs||0,ss:sv.ss||[],sa:sv.sa||null,fa:sv.fa||null,notes:sv.notes||[]};return{...b,st:'to-read',hrs:0,ss:[],sa:null,fa:null,notes:[]};});SV();syncStatus='🟢';RD();}catch(e){syncStatus='🔴';}updateSyncUI();}).catch(()=>{syncStatus='🔴';updateSyncUI();});}
+function updateSyncUI(){const el=document.getElementById('syncStatus');if(el)el.innerHTML=syncStatus+(gistToken?' 已连接':' 未配置');}
 
 // ═══════════ HELPERS ═══════════
 function gws(d){const dd=new Date(d);dd.setDate(dd.getDate()-(dd.getDay()||7)+1);dd.setHours(0,0,0,0);return dd.toISOString().split('T')[0];}
@@ -852,6 +857,8 @@ function subH(){const as=['h1','h2','h3','h4','h5'].map(id=>document.getElementB
 LD();const afc=S.books.find(b=>b.id==='a23');if(afc&&afc.st==='to-read'){afc.st='reading';afc.sa='2026-05-09';SV();}
 // Park 搁置 books
 S.books.filter(b=>b.nw==='搁置').forEach(b=>{if(b.st==='to-read')b.st='parked';});
+// Init cloud sync
+if(gistToken){document.getElementById('gistTokenInput').value=gistToken;syncFromGist();updateSyncUI();}
 RD();RR();
 </script>
 
