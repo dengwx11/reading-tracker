@@ -464,12 +464,15 @@ function syncFromGist(){syncStatus='🟡';updateSyncUI();fetch(GIST_RAW+'?t='+Da
 function updateSyncUI(){const el=document.getElementById('syncStatus');const el2=document.getElementById('syncStatusM');const txt=syncStatus+(gistToken?' 已连接':' 未配置');if(el)el.innerHTML=txt;if(el2)el2.innerHTML=txt;}
 
 // ═══════════ HELPERS ═══════════
-function gws(d){const dd=new Date(d);dd.setDate(dd.getDate()-(dd.getDay()||7)+1);dd.setHours(0,0,0,0);return dd.toISOString().split('T')[0];}
-function gwe(w){const d=new Date(w);d.setDate(d.getDate()+6);return d.toISOString().split('T')[0];}
-function tws(){return gws(new Date().toISOString().split('T')[0]);}
+function ymd(date){const d=date instanceof Date?date:new Date(date);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
+function parseYmd(s){if(!s)return new Date();const m=String(s).match(/^(\d{4})-(\d{2})-(\d{2})/);return m?new Date(Number(m[1]),Number(m[2])-1,Number(m[3])):new Date(s);}
+function normDate(s){return String(s||'').slice(0,10);}
+function gws(d){const dd=parseYmd(d);const day=dd.getDay()||7;dd.setDate(dd.getDate()-day+1);dd.setHours(0,0,0,0);return ymd(dd);}
+function gwe(w){const d=parseYmd(w);d.setDate(d.getDate()+6);return ymd(d);}
+function tws(){return gws(ymd(new Date()));}
 function wtgt(){return S.settings.pp?21:(S.settings.dh||7)*7;}
 function hfs(ss){return ss.reduce((s,x)=>s+(x.m||0),0)/60;}
-function whrs(books,wk){const e=gwe(wk);let t=0;books.forEach(b=>b.ss.forEach(s=>{if(s.d>=wk&&s.d<=e)t+=s.m;}));return t/60;}
+function whrs(books,wk){const e=gwe(wk);let t=0;books.forEach(b=>(b.ss||[]).forEach(s=>{const d=normDate(s.d);if(d>=wk&&d<=e)t+=s.m;}));return t/60;}
 function wbp(b){return Math.min(100,Math.round((b.hrs/b.hr)*100));}
 function inw(){if(!S.settings.due)return false;const d=new Date(S.settings.due);const stt=new Date(d);stt.setDate(stt.getDate()-120);const en=new Date(d);en.setDate(en.getDate()+30);const n=new Date();return n>=stt&&n<=en;}
 function toast(m){const el=document.getElementById('toast');el.textContent=m;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),1800);}
@@ -495,7 +498,7 @@ function SW(tab,btn){
 // ═══════════ DASHBOARD ═══════════
 function RD(){
   const wk=tws();const wh=whrs(S.books,wk);const tgt=wtgt();const wp=Math.min(100,Math.round((wh/tgt)*100));const reading=S.books.filter(b=>b.st==='reading');
-  const d=new Date(wk);
+  const d=parseYmd(wk);
   document.getElementById('dashWeekLabel').textContent=`${d.getFullYear()}年 · 第${Math.ceil((d.getTime()-new Date(d.getFullYear(),0,1).getTime())/86400000/7)}周 · ${wk} → ${gwe(wk)}`;
   const circ=377;document.getElementById('ringFg').setAttribute('stroke-dashoffset',circ-(circ*wp/100));
   document.getElementById('ringHours').textContent=wh.toFixed(1);document.getElementById('weekTargetLabel').textContent=`${tgt}h / 周`;
@@ -514,7 +517,7 @@ function RD(){
   }
 
   const we=gwe(wk);const slotHrs={A:0,B:0,C:0};const intHrs={Deep:0,Guided:0,Skim:0,'Long-term':0};
-  S.books.forEach(b=>{b.ss.forEach(s=>{if(s.d>=wk&&s.d<=we){slotHrs[b.sl]=(slotHrs[b.sl]||0)+s.m;intHrs[b.i]=(intHrs[b.i]||0)+s.m;}});});
+  S.books.forEach(b=>{b.ss.forEach(s=>{const d=normDate(s.d);if(d>=wk&&d<=we){slotHrs[b.sl]=(slotHrs[b.sl]||0)+s.m;intHrs[b.i]=(intHrs[b.i]||0)+s.m;}});});
   Object.keys(slotHrs).forEach(k=>slotHrs[k]=slotHrs[k]/60);Object.keys(intHrs).forEach(k=>intHrs[k]=intHrs[k]/60);
   const slotM=Math.max(...Object.values(slotHrs),1);const intM=Math.max(...Object.values(intHrs),1);
 
@@ -534,7 +537,7 @@ function RD(){
 }
 
 // ═══════════ RECORD ═══════════
-function openRS(){const sel=document.getElementById('rb');const rdg=S.books.filter(b=>b.st==='reading');const rct=S.books.filter(b=>b.ss.length>0&&b.st!=='reading').sort((a,b)=>(b.ss[b.ss.length-1]?.d||'').localeCompare(a.ss[a.ss.length-1]?.d||''));const c=[...rdg,...rct].slice(0,20);sel.innerHTML=c.map(b=>`<option value="${b.id}">${si(b.st)} ${b.t}</option>`).join('');if(c.length===0)sel.innerHTML='<option value="">-- 请先标记在读 --</option>';document.getElementById('rm').value=45;document.getElementById('rd').value=new Date().toISOString().split('T')[0];document.getElementById('rn').value='';document.getElementById('ro').classList.add('open');}
+function openRS(){const sel=document.getElementById('rb');const rdg=S.books.filter(b=>b.st==='reading');const rct=S.books.filter(b=>b.ss.length>0&&b.st!=='reading').sort((a,b)=>(b.ss[b.ss.length-1]?.d||'').localeCompare(a.ss[a.ss.length-1]?.d||''));const c=[...rdg,...rct].slice(0,20);sel.innerHTML=c.map(b=>`<option value="${b.id}">${si(b.st)} ${b.t}</option>`).join('');if(c.length===0)sel.innerHTML='<option value="">-- 请先标记在读 --</option>';document.getElementById('rm').value=45;document.getElementById('rd').value=ymd(new Date());document.getElementById('rn').value='';document.getElementById('ro').classList.add('open');}
 function closeRS(){document.getElementById('ro').classList.remove('open');}
 function subR(){const bid=document.getElementById('rb').value;const m=parseInt(document.getElementById('rm').value)||0;const dt=document.getElementById('rd').value;const nt=document.getElementById('rn').value.trim();if(!bid){toast('请选书');return;}if(m<=0||m>600){toast('分钟不合理');return;}if(!dt){toast('请选日期');return;}const b=S.books.find(x=>x.id===bid);if(!b){toast('找不到这本书');return;}b.ss.push({d:dt,m,nt});b.hrs=hfs(b.ss);closeRS();refreshAll();toast(`+${m}分钟 · ${b.t}`);SV();}
 
@@ -546,7 +549,7 @@ function RL(){BF();const q=(document.getElementById('searchInput').value||'').to
   document.getElementById('bookList').innerHTML=bs.map(b=>{const p=wbp(b);const isE=eb===b.id;return `<div><div class="book-row" onclick="TBD('${b.id}')"><span class="b-st">${si(b.st)}</span><div class="b-info"><div class="b-title">${b.t}</div><div class="b-author">${b.au}</div></div><div class="b-q">${b.q||''}${(b.notes||[]).length>0?' 📝':''}</div><div class="b-tags">${PS(b.sl)} ${PI(b.i)} <span class="pill pill-net">${b.nw}</span>${b.pr===1?' <span class="pill pill-p1">P1</span>':''}${b.wn?' <span class="pill pill-star">⭐窗口期</span>':''}</div><div class="b-right"><div data-hours="${b.id}">${b.hrs.toFixed(1)}/${b.hr}h${p>=100&&b.st!=='done'?' 🎯':''}</div><div class="pbar" data-bid="${b.id}" style="width:60px"><div class="pbar-fill${p>=100?' done':''}" style="width:${Math.min(100,p)}%"></div></div></div></div><div class="book-detail${isE?' open':''}" id="detail-${b.id}"><div style="font-size:.76rem;color:var(--text2);margin-bottom:6px">${b.nw} · ${b.au} · ${b.hr}h · ${b.q||''}${p>=100?' · 🎯 已达标':''}${b.st==='done'?' · ✅ 已读完':''}</div><div style="margin-bottom:8px;display:flex;align-items:center;gap:8px"><span style="font-size:.7rem;color:var(--text2);flex-shrink:0">📊</span><div class="pbar" data-bid="${b.id}" data-max="${b.hr}" style="flex:1;height:10px;cursor:ew-resize" onpointerdown="event.stopPropagation();pbarDragStart(event,'${b.id}',${b.hr})"><div class="pbar-fill${p>=100?' done':''}" style="width:${Math.min(100,p)}%"></div></div><span data-hours="${b.id}" style="font-size:.7rem;color:var(--text2);min-width:64px;text-align:right">${b.hrs.toFixed(1)} / ${b.hr}h</span></div>${b.ss.length>0?`<div style="font-size:.76rem;margin-bottom:8px">最近：${b.ss.slice(-5).reverse().map((s,j)=>{const si=b.ss.length-1-j;return`<div class="session" style="display:flex;justify-content:space-between;align-items:center">${s.d} · ${s.m}分钟${s.nt?' · '+s.nt:''}<span style="cursor:pointer;font-size:.65rem;opacity:.5" onclick="event.stopPropagation();delSession('${b.id}',${si})" title="删除此记录">🗑</span></div>`;}).join('')}</div>`:'<div style="font-size:.76rem;color:var(--text3);margin-bottom:8px">暂无记录</div>'}${(()=>{const eid2='ed2'+b.id;const notes2=b.notes||[];const lastN2=notes2.length>0?notes2[notes2.length-1]:null;return`<div style="margin-bottom:8px"><label style="font-size:.72rem;color:var(--text2);margin-bottom:3px;display:block" id="lbl_${eid2}">✏️ 随想（支持粘贴图片）</label><div id="${eid2}" contenteditable="true" data-editidx="-1" style="min-height:48px;max-height:200px;overflow-y:auto;padding:8px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:.76rem;font-family:var(--font-sans);outline:none;line-height:1.5;word-break:break-word" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">${lastN2?lastN2.html:''}</div><div style="display:flex;gap:6px;margin-top:4px"><button class="btn btn-primary btn-sm" id="sbtn_${eid2}" onclick="const el2=document.getElementById('${eid2}');const ei2=parseInt(el2.dataset.editidx||'-1');SN('${b.id}',el2.innerHTML,ei2>=0?ei2:undefined);el2.innerHTML='';el2.dataset.editidx='-1';document.getElementById('lbl_${eid2}').textContent='✏️ 随想（支持粘贴图片）';this.textContent='💾 保存';toast(ei2>=0?'已更新✨':'已保存✨');RL();RD()">💾 保存</button></div>${notes2.length>0?`<div style="margin-top:8px;font-size:.68rem;color:var(--text3);border-top:1px solid var(--border-light);padding-top:6px">📋 记录 (${notes2.length})${notes2.slice(-4).reverse().map((n,i)=>{const idx=notes2.length-1-i;return`<div style="margin-top:4px;padding:6px 8px;background:var(--card);border-radius:6px;cursor:pointer" onclick="const ed2=document.getElementById('${eid2}');ed2.innerHTML=this.querySelector('.nc2').innerHTML;ed2.dataset.editidx='${idx}';document.getElementById('lbl_${eid2}').textContent='📝 编辑中 ('+this.querySelector('.nc2x').textContent+')';document.getElementById('sbtn_${eid2}').textContent='📝 更新'" title="点击加载到编辑器，再点更新保存修改"><div style="font-size:.62rem;color:var(--accent);margin-bottom:2px"><span class="nc2x">${fmtTs(n.ts)}</span></div><div class="nc2" style="font-size:.72rem;color:var(--text);line-height:1.4;max-height:60px;overflow:hidden">${n.html}</div><span style="font-size:.6rem;color:var(--text3);cursor:pointer" onclick="event.stopPropagation();delNote('${b.id}',${idx});RL();RD()">🗑</span></div>`;}).join('')}</div>`:''}</div>`;})()}<div style="display:flex;gap:6px;flex-wrap:wrap">${b.st==='to-read'||b.st==='parked'?`<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();CS('${b.id}','reading')">开始读</button>`:''}${b.st==='reading'?`<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();CS('${b.id}','done')">${p>=100?'✅ 标记读完':'标记完成'}</button>`:''}${b.st==='reading'?`<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();CS('${b.id}','parked')">Park</button>`:''}${b.st==='done'||b.st==='parked'?`<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();CS('${b.id}','reading')">恢复</button>`:''}</div></div></div>`;}).join('')||'<div style="text-align:center;color:var(--text3);padding:48px;font-size:.9rem">没有匹配的书</div>';
 }
 function TBD(id){eb=eb===id?null:id;RL();}
-function CS(id,ns){const b=S.books.find(x=>x.id===id);if(!b)return;b.st=ns;if(ns==='reading'&&!b.sa)b.sa=new Date().toISOString().split('T')[0];if(ns==='done')b.fa=new Date().toISOString().split('T')[0];SV();RL();RD();RR();toast(`${si(ns)} ${b.t}`);}
+function CS(id,ns){const b=S.books.find(x=>x.id===id);if(!b)return;b.st=ns;if(ns==='reading'&&!b.sa)b.sa=ymd(new Date());if(ns==='done')b.fa=ymd(new Date());SV();RL();RD();RR();toast(`${si(ns)} ${b.t}`);}
 function SN(id,html,editIdx){const b=S.books.find(x=>x.id===id);if(!b)return;if(!html||html==='<br>'||html==='')return;if(editIdx!==undefined&&editIdx>=0){b.notes[editIdx]={ts:new Date().toISOString(),html};}else{b.notes.push({ts:new Date().toISOString(),html});}SV();}
 function delNote(bid,i){const b=S.books.find(x=>x.id===bid);if(!b)return;b.notes.splice(i,1);SV();RD();RL();}
 function delSession(bid,i,ev){if(ev){ev.preventDefault();ev.stopPropagation();}const b=S.books.find(x=>x.id===bid);if(!b){toast('找不到这本书');refreshAll();return;}if(i<0||i>=b.ss.length){toast('这条记录已不存在');refreshAll();return;}const s=b.ss.splice(i,1)[0];b.hrs=hfs(b.ss);refreshAll();toast(`已删除 ${s.m}分钟`);SV();}
@@ -554,14 +557,14 @@ let _dragging=false,_dId=null,_dMax=0,_dBar=null,_dFill=null;
 const DRAG_NOTE='手动拖拽校准';
 function remHtml(b,p){const rem=Math.max(0,b.hr-b.hrs);return `${rem>0?`剩余 ${rem.toFixed(1)}h`:''}${p>=100?' · 已达标':p>70?' · ⚡快完成了':''}${b.wn&&inw()?' · ⭐窗口期':''}${b.q?' · <i>'+b.q+'</i>':''}`;}
 function previewHours(b,p){const pp=Math.min(100,p);document.querySelectorAll(`[data-hours="${b.id}"]`).forEach(el=>{el.textContent=`${b.hrs.toFixed(1)}/${b.hr}h${pp>=100?' 🎯':''}`;});document.querySelectorAll(`[data-rem="${b.id}"]`).forEach(el=>{el.innerHTML=remHtml(b,pp);});document.querySelectorAll(`.pbar[data-bid="${b.id}"] .pbar-fill`).forEach(fill=>{fill.style.width=pp+'%';fill.classList.toggle('done',pp>=100);fill.classList.toggle('warm',pp>60&&pp<100);});}
-function syncDragSession(b){const today=new Date().toISOString().split('T')[0];const base=(b.ss||[]).filter(s=>s.nt!==DRAG_NOTE);const baseMin=base.reduce((sum,s)=>sum+(s.m||0),0);const targetMin=Math.round(b.hrs*60);const adj=targetMin-baseMin;b.ss=base;if(adj!==0)b.ss.push({d:today,m:adj,nt:DRAG_NOTE});b.hrs=Math.round(hfs(b.ss)*10)/10;}
+function syncDragSession(b){const today=ymd(new Date());const base=(b.ss||[]).filter(s=>s.nt!==DRAG_NOTE);const baseMin=base.reduce((sum,s)=>sum+(s.m||0),0);const targetMin=Math.round(b.hrs*60);const adj=targetMin-baseMin;b.ss=base;if(adj!==0)b.ss.push({d:today,m:adj,nt:DRAG_NOTE});b.hrs=Math.round(hfs(b.ss)*10)/10;}
 function pbarDragStart(e,id,maxHr){e.preventDefault();e.stopPropagation();const b=S.books.find(x=>x.id===id);if(!b)return;_dragging=true;_dId=id;_dMax=maxHr;_dBar=e.currentTarget;_dFill=_dBar.querySelector('.pbar-fill');if(_dBar.setPointerCapture&&e.pointerId!==undefined)_dBar.setPointerCapture(e.pointerId);document.addEventListener('pointermove',pbarDragMove,{passive:false});document.addEventListener('pointerup',pbarDragEnd,true);document.addEventListener('pointercancel',pbarDragEnd,true);pbarDragMove(e);}
 function pbarDragMove(e){if(!_dragging)return;e.preventDefault();e.stopPropagation();const r=_dBar.getBoundingClientRect();const p=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width));const v=Math.round(p*_dMax*10)/10;const b=S.books.find(x=>x.id===_dId);if(b){b.hrs=v;previewHours(b,Math.round((v/b.hr)*100));}}
 function pbarDragEnd(e){if(!_dragging)return;if(e){e.preventDefault();e.stopPropagation();}const bar=_dBar;_dragging=false;document.removeEventListener('pointermove',pbarDragMove);document.removeEventListener('pointerup',pbarDragEnd,true);document.removeEventListener('pointercancel',pbarDragEnd,true);if(bar&&bar.releasePointerCapture&&e&&e.pointerId!==undefined){try{bar.releasePointerCapture(e.pointerId);}catch(_){}}const b=S.books.find(x=>x.id===_dId);if(b){b.hrs=Math.round(b.hrs*10)/10;syncDragSession(b);SV();RD();RL();RS();toast(`已校准到 ${b.hrs.toFixed(1)}h`);} _dId=null;_dBar=null;_dFill=null;}
 function fmtTs(ts){const d=new Date(ts);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
 
 // ═══════════ EXPORT/IMPORT ═══════════
-function exp(){const d={at:new Date().toISOString(),settings:S.settings,harvests:S.harvests,books:S.books.map(b=>({id:b.id,st:b.st,hrs:b.hrs,ss:b.ss,sa:b.sa,fa:b.fa,notes:b.notes||[]}))};const blob=new Blob([JSON.stringify(d,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`reading-${new Date().toISOString().split('T')[0]}.json`;a.click();URL.revokeObjectURL(a.href);toast('已导出');}
+function exp(){const d={at:new Date().toISOString(),settings:S.settings,harvests:S.harvests,books:S.books.map(b=>({id:b.id,st:b.st,hrs:b.hrs,ss:b.ss,sa:b.sa,fa:b.fa,notes:b.notes||[]}))};const blob=new Blob([JSON.stringify(d,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`reading-${ymd(new Date())}.json`;a.click();URL.revokeObjectURL(a.href);toast('已导出');}
 function imp(ev){const f=ev.target.files[0];if(!f)return;const r=new FileReader();r.onload=function(e){try{const d=JSON.parse(e.target.result);S.settings={...DEF,...d.settings};S.harvests=d.harvests||[];S.books=B.map(b=>{const sv=(d.books||[]).find(s=>s.id===b.id);if(sv){const notes=Array.isArray(sv.notes)?sv.notes:(sv.nts?[{ts:new Date().toISOString(),html:sv.nts.replace(/\n/g,'<br>')}]:[]);return{...b,st:sv.st,hrs:sv.hrs||0,ss:sv.ss||[],sa:sv.sa||null,fa:sv.fa||null,notes};}return{...b,st:'to-read',hrs:0,ss:[],sa:null,fa:null,notes:[]};});SV();toast('已导入');RD();RL();}catch(err){toast('格式不正确');}};r.readAsText(f);ev.target.value='';}
 
 // ═══════════ RECOMMENDATION ═══════════
@@ -636,7 +639,7 @@ function US(){S.settings.due=document.getElementById('dueInput').value;S.setting
 function HM(){
   const weeks=12,cellW=14,gap=3,colW=cellW+gap,totalDays=weeks*7;
   const today=new Date();const start=new Date(today);start.setDate(start.getDate()-(totalDays-1));
-  const daily={};S.books.forEach(b=>{b.ss.forEach(s=>{daily[s.d]=(daily[s.d]||0)+s.m;});});
+  const daily={};S.books.forEach(b=>{b.ss.forEach(s=>{const d=normDate(s.d);daily[d]=(daily[d]||0)+s.m;});});
   const maxMin=Math.max(...Object.values(daily),30);
   const mn=['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
   const gridW=weeks*colW-gap; // total grid pixel width
@@ -663,7 +666,7 @@ function HM(){
   html+=`<div style="display:grid;grid-template-rows:repeat(7,${cellW}px);grid-auto-flow:column;gap:${gap}px">`;
   for(let i=0;i<totalDays;i++){
     const d=new Date(start);d.setDate(d.getDate()+i);
-    const ds=d.toISOString().split('T')[0];const m=daily[ds]||0;
+    const ds=ymd(d);const m=daily[ds]||0;
     const intensity=m===0?0:Math.min(1,m/maxMin);
     const alpha=intensity===0?0.1:intensity*0.85+0.15;
     const color=`rgba(217,68,47,${alpha.toFixed(2)})`;
@@ -743,11 +746,11 @@ function SCT(){
 
 // ═══════════ STREAK ═══════════
 function STK(){
-  const daily={};S.books.forEach(b=>{b.ss.forEach(s=>{const d=s.d;daily[d]=(daily[d]||0)+s.m;});});
-  const today=new Date().toISOString().split('T')[0];
-  let streak=0;const d=new Date(today);
+  const daily={};S.books.forEach(b=>{b.ss.forEach(s=>{const d=normDate(s.d);daily[d]=(daily[d]||0)+s.m;});});
+  const today=ymd(new Date());
+  let streak=0;const d=parseYmd(today);
   while(true){
-    const ds=d.toISOString().split('T')[0];
+    const ds=ymd(d);
     if((daily[ds]||0)>0){streak++;d.setDate(d.getDate()-1);}
     else break;
   }
@@ -758,12 +761,12 @@ function STK(){
 function WTREND(){
   const weeks=12;const today=new Date();const start=new Date(today);start.setDate(start.getDate()-weeks*7+1);
   const maxH=Math.max(...Array.from({length:weeks},(_,i)=>{
-    const s=new Date(start);s.setDate(s.getDate()+i*7);return whrs(S.books,gws(s.toISOString().split('T')[0]));
+    const s=new Date(start);s.setDate(s.getDate()+i*7);return whrs(S.books,gws(ymd(s)));
   }),1);
   let html='<div style="display:flex;align-items:flex-end;gap:4px;height:150px">';
   for(let i=0;i<weeks;i++){
     const s=new Date(start);s.setDate(s.getDate()+i*7);
-    const wk=gws(s.toISOString().split('T')[0]);const h=whrs(S.books,wk);
+    const wk=gws(ymd(s));const h=whrs(S.books,wk);
     const hPct=Math.round(h/maxH*100);
     const m=s.getMonth()+1;const dt=s.getDate();
     html+=`<div style="flex:1;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end">
@@ -786,7 +789,7 @@ function PROJ(){
   // Average weekly hours over last 4 weeks
   const today=new Date();const fourWkAgo=new Date(today);fourWkAgo.setDate(fourWkAgo.getDate()-28);
   let recentHrs=0,recentWeeks=0;
-  for(let i=0;i<4;i++){const s=new Date(fourWkAgo);s.setDate(s.getDate()+i*7);const wk=gws(s.toISOString().split('T')[0]);const h=whrs(S.books,wk);if(h>0){recentHrs+=h;recentWeeks++;}}
+  for(let i=0;i<4;i++){const s=new Date(fourWkAgo);s.setDate(s.getDate()+i*7);const wk=gws(ymd(s));const h=whrs(S.books,wk);if(h>0){recentHrs+=h;recentWeeks++;}}
   const avgWk=recentWeeks>0?recentHrs/recentWeeks:wtgt()*0.5;
   const wksLeft=avgWk>0?Math.ceil(coreRem/avgWk):999;
   const due=new Date(S.settings.due);const wksToDue=Math.ceil((due-new Date())/86400000/7);
